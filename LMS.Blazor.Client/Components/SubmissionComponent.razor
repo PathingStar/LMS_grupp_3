@@ -1,5 +1,78 @@
-﻿<h3>SubmissionComponent</h3>
+﻿@using LMS.Shared.DTOs.EntityDTO
+@inject HttpClient Http
+
+<div class="card shadow-sm p-3 mt-3">
+    <h5>Ladda upp inlämning</h5>
+
+    <InputFile OnChange="HandleFileSelected" />
+    <button class="btn btn-primary mt-2" @onclick="UploadFile" disabled="@(!fileSelected)">Ladda upp</button>
+
+    @if (isUploading)
+    {
+        <p>Laddar upp fil...</p>
+    }
+
+    @if (Submissions?.Any() == true)
+    {
+        <h6 class="mt-3">Mina inlämningar:</h6>
+        <ul class="list-group">
+            @foreach (var submission in Submissions)
+            {
+                <li class="list-group-item">
+                    📄 @submission.FileName <br />
+                    <small class="text-muted">Uppladdad: @submission.SubmittedAt</small>
+                </li>
+            }
+        </ul>
+    }
+</div>
 
 @code {
+    [Parameter] public Guid DocumentId { get; set; }   // vilken uppgift det gäller
+    [Parameter] public string UserId { get; set; } = ""; // vem som laddar upp
 
+    private IBrowserFile? selectedFile;
+    private bool fileSelected => selectedFile != null;
+    private bool isUploading = false;
+
+    public List<SubmissionDto> Submissions { get; set; } = new();
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+    }
+
+    private async Task UploadFile()
+    {
+        if (selectedFile is null) return;
+
+        isUploading = true;
+
+        try
+        {
+            var content = new MultipartFormDataContent();
+            content.Add(new StreamContent(selectedFile.OpenReadStream(maxAllowedSize: 10_000_000)), "File", selectedFile.Name);
+            content.Add(new StringContent(UserId), "UserId");
+            content.Add(new StringContent(DocumentId.ToString()), "DocumentId");
+
+            var response = await Http.PostAsync("api/submissions", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var submission = await response.Content.ReadFromJsonAsync<SubmissionDto>();
+                if (submission != null)
+                {
+                    Submissions.Add(submission);
+                }
+            }
+            else
+            {
+                Console.WriteLine($"Fel vid uppladdning: {response.StatusCode}");
+            }
+        }
+        finally
+        {
+            isUploading = false;            
+        }
+    }
 }
