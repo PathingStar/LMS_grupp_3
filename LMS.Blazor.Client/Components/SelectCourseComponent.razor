@@ -1,0 +1,48 @@
+﻿@rendermode InteractiveWebAssembly
+
+<div class="form-floating mb-3">
+	@* <label for="course" class="form-label">Course (only for Students)</label> *@
+	<InputSelect id="course" class="form-select" @bind-Value="CourseId">
+		<option value="">-- Select Course --</option>
+		<select @onchange="OnCourseSelected">
+			@foreach (var course in Courses ?? new List<CourseDto>())
+			{
+				<option value="@course.Id">@course.Name</option>
+			}
+		</select>
+	</InputSelect>
+</div>
+@code {
+
+	[Parameter]
+	public Guid? CourseId { get; set; }
+
+	[Parameter] public EventCallback<Guid?> CourseIdChanged { get; set; }
+
+	[Inject]
+	private IApiService myApi { get; set; }
+
+	List<CourseDto> Courses = new List<CourseDto>();
+
+	protected override async Task OnParametersSetAsync()
+	{
+		var response = await myApi.CallApiGetAsync<IEnumerable<CourseDto>>("courses");
+		Courses = response?.ToList();
+		StateHasChanged();
+	}
+	protected override async Task OnInitializedAsync()
+	{
+		var response = await myApi.CallApiGetAsync<IEnumerable<CourseDto>>("courses");
+		Courses = response?.ToList();
+		StateHasChanged();
+	}
+
+	private async Task OnCourseSelected(ChangeEventArgs e)
+	{
+		if (Guid.TryParse(e.Value?.ToString(), out var newId))
+		{
+			CourseId = newId;
+			await CourseIdChanged.InvokeAsync(newId);
+		}
+	}
+}
